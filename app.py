@@ -8,12 +8,14 @@ app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
 
 orders = []
-ratio = {f'{i}-{i+1}E':'' for i in range(10)}
+ratio = {f'{i}-{i+1}E': '' for i in range(10)}
 order_id = 1
 
-PRICES = {'飛空艇英靈':500,'博物島英靈':300,'迷蹤島英靈':100,'星座塔Ⅵ':800,'混亂時空噩夢':800,'12人英靈':100,'神諭11':100}
+# 副本價格
+PRICES = {'飛空艇英靈': 500, '博物島英靈': 300, '迷蹤島英靈': 100, '星座塔Ⅵ': 800, '混亂時空噩夢': 800, '12人英靈': 100, '神諭11': 100}
 TWD_CNY = 0.217
 
+# 客戶版HTML
 CLIENT_HTML = '''<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -29,7 +31,6 @@ body { font-family: 'Noto Sans TC', sans-serif; background: linear-gradient(180d
 .container { max-width: 520px; margin: 0 auto; }
 h1 { text-align: center; font-size: 28px; font-weight: 700; background: linear-gradient(90deg, #ffd700, #ffaa00, #ffd700); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 4px; }
 .subtitle { text-align: center; color: #aaa; font-size: 14px; margin-bottom: 20px; }
-.tab-box { display: flex; gap: 8px; margin-bottom: 20px; }
 .tab { flex: 1; padding: 14px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #aaa; font-size: 16px; font-weight: 600; border-radius: 12px; text-align: center; cursor: pointer; transition: all 0.2s; }
 .tab.active { background: linear-gradient(135deg, #e6b800, #ffd700); color: #1a1a2e; }
 .section { display: none; }
@@ -65,7 +66,7 @@ h1 { text-align: center; font-size: 28px; font-weight: 700; background: linear-g
 <div class="container">
 <h1>⚔️ RO專業帶本代拉</h1>
 <p class="subtitle">仙境傳說RO守護永恆的愛 Classic</p>
-<div class="tab-box">
+<div style="display:flex;gap:8px;margin-bottom:20px;">
 <button class="tab active" data-target="dungeon" onclick="switchTab(this)">📦 躺本</button>
 <button class="tab" data-target="buy" onclick="switchTab(this)">💰 代拉</button>
 </div>
@@ -179,6 +180,7 @@ loadRatio();
 </body>
 </html>'''
 
+# 管理版HTML
 ADMIN_HTML = '''<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -270,10 +272,15 @@ async function loadOrders() {
     const data = await res.json();
     const all = data.orders || [];
     
+    // 待辦：未完成的
     let pending = all.filter(o => !o.done);
+    // 記錄：已完成的
     let history = all.filter(o => o.done);
     
+    // 待辦按時間倒序（新的在上面）
     pending.sort((a,b) => b.id - a.id);
+    
+    // 記錄：未收款在前（按時間倒序），其餘在後
     let unpaid = history.filter(o => !o.paid).sort((a,b) => b.id - a.id);
     let paid = history.filter(o => o.paid).sort((a,b) => b.id - a.id);
     history = [...unpaid, ...paid];
@@ -291,6 +298,7 @@ function renderCard(o, showBtns) {
         o.items.forEach(i => counts[i] = (counts[i] || 0) + 1);
         itemsHtml = '<div class="card-items">' + Object.entries(counts).map(([name, qty]) => '<span class="item-tag">' + name + 'x' + qty + '</span>').join('') + '</div>';
     }
+    // 金額：TWD + CNY
     let priceHtml = '';
     if (o.type === '帶本' && o.items && o.items.length) {
         let twd = 0;
@@ -298,11 +306,15 @@ function renderCard(o, showBtns) {
         const cny = Math.floor(twd * TWD_CNY);
         priceHtml = '<div class="card-price">' + twd + ' 元 ≈ ' + cny + ' 人民币</div>';
     }
+    // 備註
     let noteHtml = o.note ? '<div class="card-note">備註：' + o.note + '</div>' : '';
+    // 按鈕
     let btnsHtml = '';
     if (showBtns) {
+        // 待辦：有完成和未收款按鈕
         btnsHtml = '<div class="card-btns"><button class="btn btn-complete" onclick="completeOrder(' + o.id + ')">✅ 完成</button><button class="btn btn-paid" onclick="paidOrder(' + o.id + ')">❌ 未收款</button><button class="btn btn-delete" onclick="deleteOrder(' + o.id + ')">🗑️</button></div>';
     } else {
+        // 記錄：無完成按鈕，只有未收款（如果未收款）
         const paidBtn = o.paid ? '<span style="color:#666;font-size:13px;margin-right:8px;">已收款</span>' : '<button class="btn btn-paid" onclick="paidOrder(' + o.id + ')">❌ 未收款</button>';
         btnsHtml = '<div class="card-btns">' + paidBtn + '<button class="btn btn-delete" onclick="deleteOrder(' + o.id + ')">🗑️</button></div>';
     }
@@ -416,3 +428,6 @@ def api_action():
                 orders.remove(o)
             break
     return jsonify({'ok': True})
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
